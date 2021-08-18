@@ -113,13 +113,12 @@ app.get("/api/v1/clients/:id", (req, res) => {
     .send(db.prepare("select * from clients where id = ?").get(id));
 });
 
-const getLowestPriority = () => {
-  const stmt = db
-    .prepare(
-      "SELECT * FROM clients WHERE status = 'complete' ORDER BY 'priority'"
-    )
-    .all();
-  let leastPriorityClient = stmt[stmt.length - 1];
+const newLowestPriority = () => {
+  const complete_swimlane_stmt = db.prepare(
+    "SELECT * FROM clients WHERE status = 'complete' ORDER BY 'prioriity'"
+  );
+  const complete_swimlane = complete_swimlane_stmt.all();
+  let leastPriorityClient = complete_swimlane[complete_swimlane.length - 1];
   let lowestPriority = leastPriorityClient.priority;
   return lowestPriority + 1;
 };
@@ -168,53 +167,26 @@ app.put("/api/v1/clients/:id", (req, res) => {
         .prepare(
           "SELECT * clients WHERE status = $status AND priority >= $priority ORDER BY 'priority'"
         )
-        .all({
-          status,
-          priority,
-        });
+        .all(status, priority);
 
       const updatePriority = db.prepare(
         "UPDATE clients SET priority = $priority WHERE id = $id"
       );
 
       clientSwimlane.forEach((client) => {
-        updatePriority.run({
-          priority: client.priority + 1,
-          id: client.id,
-        });
+        updatePriority.run(client.priority + 1, client.id);
       });
     }
     // Update clients by priority and status
     db.prepare(
       "UPDATE clients SET status = $status, priority = $priority WHERE id = $id"
-    ).run({
-      $status: status,
-      $priority: priority,
-      $id: id,
-    });
-  } else if (status == "complete") {
-    let clientPriority = newLowestPriority();
-    client.priority = newLowestPriority();
-    client.status = status;
-    const stmt = db.prepare("INSERT INTO clients VALUES (?, ?, ?, ?, ?) ");
-    stmt.run(
-      client.id,
-      client.name,
-      client.description,
-      status,
-      clientPriority
-    );
+    ).run(status, priority, id);
+    return res.status(200).send(clients);
   }
-  return res.status(200).send(clients);
+
+  if (status == "complete") {
+  }
 });
-const newLowestPriority = () => {
-  const complete_swimlane_stmt = db.prepare(
-    "SELECT * FROM clients WHERE status = 'complete' ORDER BY 'priority'"
-  );
-  const complete_swimlane = complete_swimlane_stmt.all();
-  let leastPriorityClient = complete_swimlane[complete_swimlane.length - 1];
-  let lowestPriority = leastPriorityClient.priority;
-  return lowestPriority + 1;
-};
+
 app.listen(3001);
 console.log("app running on port ", 3001);
